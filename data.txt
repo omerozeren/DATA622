@@ -1,4 +1,4 @@
-X,Y,label
+X,y,label
 5,a,BLUE
 5,b,BLACK
 5,c,BLUE
