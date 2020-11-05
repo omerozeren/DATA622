@@ -1,0 +1,75 @@
+---
+title: "DATA 622 - Homework 2"
+author: "OMER OZEREN"
+output:
+  html_document:
+    highlight: tango
+    theme: journal
+    toc: yes
+    toc_depth: 5
+    toc_float: yes
+---
+
+```{r echo=FALSE, include=FALSE}
+library(class)
+library(pROC)
+library(ROCR)
+library(caret)
+library(C50)
+library(e1071)
+library(naivebayes)
+library(MASS)
+library(mltools)
+library(knitr)
+```
+## Load the Data
+
+```{r}
+df <- read.table("C:/Users/OMERO/Documents/GitHub/DATA622/data.txt",header = T,sep=',')
+df$label <- ifelse(df$label =="BLACK",1,0)
+df$y <- as.numeric(df$y)
+df$X <- as.factor(df$X)
+```
+
+### Split Data into Train(70%) and Test data(30%)  
+
+```{r}
+set.seed(42)
+split_df <- createDataPartition(df$label, p = .70, list = FALSE)
+df_train <- df[split_df,]
+df_test <- df[-split_df,]
+```
+
+```{r}
+nb.model<-naiveBayes(df_train$label~.,data=df_train)
+#str(nb.model)
+object.size(nb.model) #11096
+nb.tstpred<-predict(nb.model,df_test[,-c(9)],type='raw')
+nb.tstclass<-unlist(apply(round(nb.tstpred),1,which.max))-1
+nb.tbl<-table(df_test$label, nb.tstclass)
+nb.cfm<-caret::confusionMatrix(nb.tbl)
+nb.cfm
+start_tm <- proc.time() 
+df<-df_train
+runModel<-function(df) {naiveBayes(df$label~.,data=df[sample(1:nrow(df),nrow(df),replace=T),])}
+lapplyrunmodel<-function(x)runModel(df)
+system.time(models<-lapply(1:100,lapplyrunmodel))
+object.size(models)
+end_tm<-proc.time() 
+print(paste("time taken to run 100 bootstrapps",(end_tm-start_tm),sep=":"))
+bagging_preds<-lapply(models,FUN=function(M,D=df_test[,-c(9)])predict(M,D,type='raw'))
+bagging_cfm<-lapply(bagging_preds,FUN=function(P,A=df_test$label)
+{pred_class<-unlist(apply(round(P),1,which.max))-1
+  pred_tbl<-table(A,pred_class)
+  pred_cfm<-caret::confusionMatrix(pred_tbl)
+  pred_cfm
+})
+bagging.perf<-as.data.frame(do.call('rbind',lapply(bagging_cfm,FUN=function(cfm)c(cfm$overall,cfm$byClass))))
+bagging.perf.mean<-apply(bagging.perf[bagging.perf$AccuracyPValue<0.01,-c(6:7)],2,mean)
+bagging.perf.var<-apply(bagging.perf[bagging.perf$AccuracyPValue<0.01,-c(6:7)],2,sd)
+  
+bagging.perf.var
+bagging.perf.mean
+(bagging_tm<-proc.time()-start_tm)
+```
+
