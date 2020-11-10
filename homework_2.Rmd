@@ -22,7 +22,19 @@ library(MASS)
 library(mltools)
 library(knitr)
 ```
-## Load the Data
+## A)
+
+Run Bagging (ipred package)   
+
+* sample with replacement
+
+* estimate metrics for a model
+
+* repeat as many times as specied and report the average
+
+
+
+### Load the Data
 
 ```{r}
 df <- read.table("C:/Users/OMERO/Documents/GitHub/DATA622/data.txt",header = T,sep=',')
@@ -43,8 +55,8 @@ df_test <- df[-split_df,]
 ```{r}
 nb.model<-naiveBayes(df_train$label~.,data=df_train)
 #str(nb.model)
-object.size(nb.model) #11096
-nb.tstpred<-predict(nb.model,df_test[,-c(9)],type='raw')
+object.size(nb.model)
+nb.tstpred<-predict(nb.model,df_test,type='raw')
 nb.tstclass<-unlist(apply(round(nb.tstpred),1,which.max))-1
 nb.tbl<-table(df_test$label, nb.tstclass)
 nb.cfm<-caret::confusionMatrix(nb.tbl)
@@ -57,7 +69,7 @@ system.time(models<-lapply(1:100,lapplyrunmodel))
 object.size(models)
 end_tm<-proc.time() 
 print(paste("time taken to run 100 bootstrapps",(end_tm-start_tm),sep=":"))
-bagging_preds<-lapply(models,FUN=function(M,D=df_test[,-c(9)])predict(M,D,type='raw'))
+bagging_preds<-lapply(models,FUN=function(M,D=df_test)predict(M,D,type='raw'))
 bagging_cfm<-lapply(bagging_preds,FUN=function(P,A=df_test$label)
 {pred_class<-unlist(apply(round(P),1,which.max))-1
   pred_tbl<-table(A,pred_class)
@@ -65,11 +77,84 @@ bagging_cfm<-lapply(bagging_preds,FUN=function(P,A=df_test$label)
   pred_cfm
 })
 bagging.perf<-as.data.frame(do.call('rbind',lapply(bagging_cfm,FUN=function(cfm)c(cfm$overall,cfm$byClass))))
-bagging.perf.mean<-apply(bagging.perf[bagging.perf$AccuracyPValue<0.01,-c(6:7)],2,mean)
-bagging.perf.var<-apply(bagging.perf[bagging.perf$AccuracyPValue<0.01,-c(6:7)],2,sd)
+bagging.perf.mean<-mean(bagging.perf$Accuracy)
+bagging.perf.var<-sd(bagging.perf$Accuracy)
   
 bagging.perf.var
 bagging.perf.mean
 (bagging_tm<-proc.time()-start_tm)
 ```
 
+## B)
+
+Run LOOCV (jacknife) for the same dataset
+
+* iterate over all points
+
+* keep one observation as test
+
+* train using the rest of the observations
+
+* determine test metrics
+
+* aggregate the test metrics
+
+end of loop
+
+find the average of the test metric(s)
+
+Compare (A), (B) above with the results you obtained in HW-1  and write 3 sentences explaining the
+
+observed difference.
+
+### Jacknife: Leave One Out (LOO) Cross Validation
+
+
+```{r running_jacknife_loocv}
+df_train_num<-nrow(df_train)
+
+cv_df<-do.call('rbind',lapply(1:df_train_num,FUN=function(idx,data=df_train) { # For each observation
+  m<-naiveBayes(data$label[-idx]~.,data=data[-idx,]) # train with ALL other observations
+  p<-predict(m,data[idx,-df_train_num],type='raw') # predict that one observation
+   # NB returns the probabilities of the classes, as per Bayesian Classifier,we take the classs with the higher probability
+   pc<-unlist(apply(round(p),1,which.max))-1 # -1 to make class to be 0 or 1, which.max returns 1 or 2
+  list(fold=idx,m=m,predicted=pc,actual=data$label[idx]) # store the idx, model, predicted class and actual class
+  }
+))
+
+```
+
+
+```{r averaging_the_cv}
+
+cv_df<-as.data.frame(cv_df)
+head(cv_df)
+tail(cv_df)
+table(as.numeric(cv_df$actual)==as.numeric(cv_df$predicted))
+
+loocv_tbl<-table(as.numeric(cv_df$actual),as.numeric(cv_df$predicted))
+sum(diag(loocv_tbl))/sum(loocv_tbl)
+(loocv_caret_cfm<-caret::confusionMatrix(loocv_tbl))
+# now we have to apply the training models to testdata and average them 
+# since this is classification we will take the majority vote
+# double loop
+
+tstcv.perf<-as.data.frame(do.call('cbind',lapply(cv_df$m,FUN=function(m,data=df_test)
+{
+   
+  v<-predict(m,data,type='raw')
+  lbllist<-unlist(apply(round(v),1,which.max))-1
+ 
+}
+  )))
+np<-ncol(tstcv.perf)
+predclass<-unlist(apply(tstcv.perf,1,FUN=function(v){ ifelse(sum(v[2:length(v)])/np<0.5,0,1)}))
+loocvtbl<-table(df_test$label,predclass)
+(loocv_cfm<-caret::confusionMatrix(loocvtbl))
+
+```
+```{r comparing-metrics}
+print(paste('Bagging:',bagging.perf.mean[1]))
+print(paste('LOO-CV:',loocv_cfm$overall[1]))
+print(paste('Base NB',nb.cfm$overall[[1]]))
+```

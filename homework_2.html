@@ -307,12 +307,21 @@ div.tocify {
 </div>
 
 
-<div id="load-the-data" class="section level2">
-<h2>Load the Data</h2>
+<div id="a" class="section level2">
+<h2>A)</h2>
+<p>Run Bagging (ipred package)</p>
+<ul>
+<li><p>sample with replacement</p></li>
+<li><p>estimate metrics for a model</p></li>
+<li><p>repeat as many times as specied and report the average</p></li>
+</ul>
+<div id="load-the-data" class="section level3">
+<h3>Load the Data</h3>
 <div class="sourceCode"><pre class="sourceCode r"><code class="sourceCode r">df &lt;-<span class="st"> </span><span class="kw">read.table</span>(<span class="st">&quot;C:/Users/OMERO/Documents/GitHub/DATA622/data.txt&quot;</span>,<span class="dt">header =</span> T,<span class="dt">sep=</span><span class="st">','</span>)
 df<span class="op">$</span>label &lt;-<span class="st"> </span><span class="kw">ifelse</span>(df<span class="op">$</span>label <span class="op">==</span><span class="st">&quot;BLACK&quot;</span>,<span class="dv">1</span>,<span class="dv">0</span>)
 df<span class="op">$</span>y &lt;-<span class="st"> </span><span class="kw">as.numeric</span>(df<span class="op">$</span>y)
 df<span class="op">$</span>X &lt;-<span class="st"> </span><span class="kw">as.factor</span>(df<span class="op">$</span>X)</code></pre></div>
+</div>
 <div id="split-data-into-train70-and-test-data30" class="section level3">
 <h3>Split Data into Train(70%) and Test data(30%)</h3>
 <div class="sourceCode"><pre class="sourceCode r"><code class="sourceCode r"><span class="kw">set.seed</span>(<span class="dv">42</span>)
@@ -321,9 +330,9 @@ df_train &lt;-<span class="st"> </span>df[split_df,]
 df_test &lt;-<span class="st"> </span>df[<span class="op">-</span>split_df,]</code></pre></div>
 <div class="sourceCode"><pre class="sourceCode r"><code class="sourceCode r">nb.model&lt;-<span class="kw">naiveBayes</span>(df_train<span class="op">$</span>label<span class="op">~</span>.,<span class="dt">data=</span>df_train)
 <span class="co">#str(nb.model)</span>
-<span class="kw">object.size</span>(nb.model) <span class="co">#11096</span></code></pre></div>
+<span class="kw">object.size</span>(nb.model)</code></pre></div>
 <pre><code>## 5680 bytes</code></pre>
-<div class="sourceCode"><pre class="sourceCode r"><code class="sourceCode r">nb.tstpred&lt;-<span class="kw">predict</span>(nb.model,df_test[,<span class="op">-</span><span class="kw">c</span>(<span class="dv">9</span>)],<span class="dt">type=</span><span class="st">'raw'</span>)
+<div class="sourceCode"><pre class="sourceCode r"><code class="sourceCode r">nb.tstpred&lt;-<span class="kw">predict</span>(nb.model,df_test,<span class="dt">type=</span><span class="st">'raw'</span>)
 nb.tstclass&lt;-<span class="kw">unlist</span>(<span class="kw">apply</span>(<span class="kw">round</span>(nb.tstpred),<span class="dv">1</span>,which.max))<span class="op">-</span><span class="dv">1</span>
 nb.tbl&lt;-<span class="kw">table</span>(df_test<span class="op">$</span>label, nb.tstclass)
 nb.cfm&lt;-caret<span class="op">::</span><span class="kw">confusionMatrix</span>(nb.tbl)
@@ -361,17 +370,17 @@ runModel&lt;-<span class="cf">function</span>(df) {<span class="kw">naiveBayes</
 lapplyrunmodel&lt;-<span class="cf">function</span>(x)<span class="kw">runModel</span>(df)
 <span class="kw">system.time</span>(models&lt;-<span class="kw">lapply</span>(<span class="dv">1</span><span class="op">:</span><span class="dv">100</span>,lapplyrunmodel))</code></pre></div>
 <pre><code>##    user  system elapsed 
-##    0.16    0.01    0.17</code></pre>
+##    0.17    0.00    0.17</code></pre>
 <div class="sourceCode"><pre class="sourceCode r"><code class="sourceCode r"><span class="kw">object.size</span>(models)</code></pre></div>
 <pre><code>## 568848 bytes</code></pre>
 <div class="sourceCode"><pre class="sourceCode r"><code class="sourceCode r">end_tm&lt;-<span class="kw">proc.time</span>() 
 <span class="kw">print</span>(<span class="kw">paste</span>(<span class="st">&quot;time taken to run 100 bootstrapps&quot;</span>,(end_tm<span class="op">-</span>start_tm),<span class="dt">sep=</span><span class="st">&quot;:&quot;</span>))</code></pre></div>
-<pre><code>## [1] &quot;time taken to run 100 bootstrapps:0.31&quot;
+<pre><code>## [1] &quot;time taken to run 100 bootstrapps:0.33&quot;
 ## [2] &quot;time taken to run 100 bootstrapps:0.01&quot;
 ## [3] &quot;time taken to run 100 bootstrapps:0.35&quot;
 ## [4] &quot;time taken to run 100 bootstrapps:NA&quot;  
 ## [5] &quot;time taken to run 100 bootstrapps:NA&quot;</code></pre>
-<div class="sourceCode"><pre class="sourceCode r"><code class="sourceCode r">bagging_preds&lt;-<span class="kw">lapply</span>(models,<span class="dt">FUN=</span><span class="cf">function</span>(M,<span class="dt">D=</span>df_test[,<span class="op">-</span><span class="kw">c</span>(<span class="dv">9</span>)])<span class="kw">predict</span>(M,D,<span class="dt">type=</span><span class="st">'raw'</span>))
+<div class="sourceCode"><pre class="sourceCode r"><code class="sourceCode r">bagging_preds&lt;-<span class="kw">lapply</span>(models,<span class="dt">FUN=</span><span class="cf">function</span>(M,<span class="dt">D=</span>df_test)<span class="kw">predict</span>(M,D,<span class="dt">type=</span><span class="st">'raw'</span>))
 bagging_cfm&lt;-<span class="kw">lapply</span>(bagging_preds,<span class="dt">FUN=</span><span class="cf">function</span>(P,<span class="dt">A=</span>df_test<span class="op">$</span>label)
 {pred_class&lt;-<span class="kw">unlist</span>(<span class="kw">apply</span>(<span class="kw">round</span>(P),<span class="dv">1</span>,which.max))<span class="op">-</span><span class="dv">1</span>
   pred_tbl&lt;-<span class="kw">table</span>(A,pred_class)
@@ -379,38 +388,173 @@ bagging_cfm&lt;-<span class="kw">lapply</span>(bagging_preds,<span class="dt">FU
   pred_cfm
 })
 bagging.perf&lt;-<span class="kw">as.data.frame</span>(<span class="kw">do.call</span>(<span class="st">'rbind'</span>,<span class="kw">lapply</span>(bagging_cfm,<span class="dt">FUN=</span><span class="cf">function</span>(cfm)<span class="kw">c</span>(cfm<span class="op">$</span>overall,cfm<span class="op">$</span>byClass))))
-bagging.perf.mean&lt;-<span class="kw">apply</span>(bagging.perf[bagging.perf<span class="op">$</span>AccuracyPValue<span class="op">&lt;</span><span class="fl">0.01</span>,<span class="op">-</span><span class="kw">c</span>(<span class="dv">6</span><span class="op">:</span><span class="dv">7</span>)],<span class="dv">2</span>,mean)
-bagging.perf.var&lt;-<span class="kw">apply</span>(bagging.perf[bagging.perf<span class="op">$</span>AccuracyPValue<span class="op">&lt;</span><span class="fl">0.01</span>,<span class="op">-</span><span class="kw">c</span>(<span class="dv">6</span><span class="op">:</span><span class="dv">7</span>)],<span class="dv">2</span>,sd)
+bagging.perf.mean&lt;-<span class="kw">mean</span>(bagging.perf<span class="op">$</span>Accuracy)
+bagging.perf.var&lt;-<span class="kw">sd</span>(bagging.perf<span class="op">$</span>Accuracy)
   
 bagging.perf.var</code></pre></div>
-<pre><code>##             Accuracy                Kappa        AccuracyLower 
-##                   NA                   NA                   NA 
-##        AccuracyUpper         AccuracyNull          Sensitivity 
-##                   NA                   NA                   NA 
-##          Specificity       Pos Pred Value       Neg Pred Value 
-##                   NA                   NA                   NA 
-##            Precision               Recall                   F1 
-##                   NA                   NA                   NA 
-##           Prevalence       Detection Rate Detection Prevalence 
-##                   NA                   NA                   NA 
-##    Balanced Accuracy 
-##                   NA</code></pre>
+<pre><code>## [1] 0.1879071</code></pre>
 <div class="sourceCode"><pre class="sourceCode r"><code class="sourceCode r">bagging.perf.mean</code></pre></div>
-<pre><code>##             Accuracy                Kappa        AccuracyLower 
-##                  NaN                  NaN                  NaN 
-##        AccuracyUpper         AccuracyNull          Sensitivity 
-##                  NaN                  NaN                  NaN 
-##          Specificity       Pos Pred Value       Neg Pred Value 
-##                  NaN                  NaN                  NaN 
-##            Precision               Recall                   F1 
-##                  NaN                  NaN                  NaN 
-##           Prevalence       Detection Rate Detection Prevalence 
-##                  NaN                  NaN                  NaN 
-##    Balanced Accuracy 
-##                  NaN</code></pre>
+<pre><code>## [1] 0.562</code></pre>
 <div class="sourceCode"><pre class="sourceCode r"><code class="sourceCode r">(bagging_tm&lt;-<span class="kw">proc.time</span>()<span class="op">-</span>start_tm)</code></pre></div>
 <pre><code>##    user  system elapsed 
-##    0.75    0.06    0.83</code></pre>
+##    0.73    0.04    0.80</code></pre>
+</div>
+</div>
+<div id="b" class="section level2">
+<h2>B)</h2>
+<p>Run LOOCV (jacknife) for the same dataset</p>
+<ul>
+<li><p>iterate over all points</p></li>
+<li><p>keep one observation as test</p></li>
+<li><p>train using the rest of the observations</p></li>
+<li><p>determine test metrics</p></li>
+<li><p>aggregate the test metrics</p></li>
+</ul>
+<p>end of loop</p>
+<p>find the average of the test metric(s)</p>
+<p>Compare (A), (B) above with the results you obtained in HW-1 and write 3 sentences explaining the</p>
+<p>observed difference.</p>
+<div id="jacknife-leave-one-out-loo-cross-validation" class="section level3">
+<h3>Jacknife: Leave One Out (LOO) Cross Validation</h3>
+<div class="sourceCode"><pre class="sourceCode r"><code class="sourceCode r">df_train_num&lt;-<span class="kw">nrow</span>(df_train)
+
+cv_df&lt;-<span class="kw">do.call</span>(<span class="st">'rbind'</span>,<span class="kw">lapply</span>(<span class="dv">1</span><span class="op">:</span>df_train_num,<span class="dt">FUN=</span><span class="cf">function</span>(idx,<span class="dt">data=</span>df_train) { <span class="co"># For each observation</span>
+  m&lt;-<span class="kw">naiveBayes</span>(data<span class="op">$</span>label[<span class="op">-</span>idx]<span class="op">~</span>.,<span class="dt">data=</span>data[<span class="op">-</span>idx,]) <span class="co"># train with ALL other observations</span>
+  p&lt;-<span class="kw">predict</span>(m,data[idx,<span class="op">-</span>df_train_num],<span class="dt">type=</span><span class="st">'raw'</span>) <span class="co"># predict that one observation</span>
+   <span class="co"># NB returns the probabilities of the classes, as per Bayesian Classifier,we take the classs with the higher probability</span>
+   pc&lt;-<span class="kw">unlist</span>(<span class="kw">apply</span>(<span class="kw">round</span>(p),<span class="dv">1</span>,which.max))<span class="op">-</span><span class="dv">1</span> <span class="co"># -1 to make class to be 0 or 1, which.max returns 1 or 2</span>
+  <span class="kw">list</span>(<span class="dt">fold=</span>idx,<span class="dt">m=</span>m,<span class="dt">predicted=</span>pc,<span class="dt">actual=</span>data<span class="op">$</span>label[idx]) <span class="co"># store the idx, model, predicted class and actual class</span>
+  }
+))</code></pre></div>
+<div class="sourceCode"><pre class="sourceCode r"><code class="sourceCode r">cv_df&lt;-<span class="kw">as.data.frame</span>(cv_df)
+<span class="kw">head</span>(cv_df)</code></pre></div>
+<pre><code>##   fold
+## 1    1
+## 2    2
+## 3    3
+## 4    4
+## 5    5
+## 6    6
+##                                                                                                                                                                                                                                     m
+## 1     11, 14, 0.09090909, 0.1428571, 0.2727273, 0.07142857, 0.09090909, 0.2857143, 0.09090909, 0.2857143, 0, 0.2142857, 0.4545455, 0, 3.818182, 4, 1.32802, 1.88108, FALSE, TRUE, naiveBayes.default(x = X, y = Y, laplace = laplace)
+## 2    11, 14, 0.09090909, 0.1428571, 0.2727273, 0.07142857, 0.09090909, 0.2857143, 0.09090909, 0.2857143, 0, 0.2142857, 0.4545455, 0, 3.636364, 4, 1.566699, 1.88108, FALSE, TRUE, naiveBayes.default(x = X, y = Y, laplace = laplace)
+## 3         12, 13, 0.1666667, 0.07692308, 0.25, 0.07692308, 0.08333333, 0.3076923, 0.08333333, 0.3076923, 0, 0.2307692, 0.4166667, 0, 3.583333, 4, 1.505042, 1.95789, FALSE, TRUE, naiveBayes.default(x = X, y = Y, laplace = laplace)
+## 4 12, 13, 0.1666667, 0.07692308, 0.25, 0.07692308, 0.08333333, 0.3076923, 0.08333333, 0.3076923, 0, 0.2307692, 0.4166667, 0, 3.583333, 3.846154, 1.505042, 1.863963, FALSE, TRUE, naiveBayes.default(x = X, y = Y, laplace = laplace)
+## 5     11, 14, 0.1818182, 0.1428571, 0.1818182, 0.07142857, 0.09090909, 0.2857143, 0.09090909, 0.2857143, 0, 0.2142857, 0.4545455, 0, 3.636364, 4, 1.566699, 1.88108, FALSE, TRUE, naiveBayes.default(x = X, y = Y, laplace = laplace)
+## 6     11, 14, 0.1818182, 0.1428571, 0.1818182, 0.07142857, 0.09090909, 0.2857143, 0.09090909, 0.2857143, 0, 0.2142857, 0.4545455, 0, 3.545455, 4, 1.572491, 1.88108, FALSE, TRUE, naiveBayes.default(x = X, y = Y, laplace = laplace)
+##   predicted actual
+## 1         1      0
+## 2         1      0
+## 3         0      1
+## 4         0      1
+## 5         0      0
+## 6         0      0</code></pre>
+<div class="sourceCode"><pre class="sourceCode r"><code class="sourceCode r"><span class="kw">tail</span>(cv_df)</code></pre></div>
+<pre><code>##    fold
+## 21   21
+## 22   22
+## 23   23
+## 24   24
+## 25   25
+## 26   26
+##                                                                                                                                                                                                                                     m
+## 21 12, 13, 0.1666667, 0.1538462, 0.25, 0.07692308, 0.08333333, 0.3076923, 0.08333333, 0.3076923, 0, 0.1538462, 0.4166667, 0, 3.583333, 3.846154, 1.505042, 1.863963, FALSE, TRUE, naiveBayes.default(x = X, y = Y, laplace = laplace)
+## 22    11, 14, 0.1818182, 0.1428571, 0.2727273, 0.07142857, 0.09090909, 0.2857143, 0.09090909, 0.2857143, 0, 0.2142857, 0.3636364, 0, 3.727273, 4, 1.489356, 1.88108, FALSE, TRUE, naiveBayes.default(x = X, y = Y, laplace = laplace)
+## 23    11, 14, 0.1818182, 0.1428571, 0.2727273, 0.07142857, 0.09090909, 0.2857143, 0.09090909, 0.2857143, 0, 0.2142857, 0.3636364, 0, 3.636364, 4, 1.566699, 1.88108, FALSE, TRUE, naiveBayes.default(x = X, y = Y, laplace = laplace)
+## 24    11, 14, 0.1818182, 0.1428571, 0.2727273, 0.07142857, 0.09090909, 0.2857143, 0.09090909, 0.2857143, 0, 0.2142857, 0.3636364, 0, 3.545455, 4, 1.572491, 1.88108, FALSE, TRUE, naiveBayes.default(x = X, y = Y, laplace = laplace)
+## 25    11, 14, 0.1818182, 0.1428571, 0.2727273, 0.07142857, 0.09090909, 0.2857143, 0.09090909, 0.2857143, 0, 0.2142857, 0.3636364, 0, 3.454545, 4, 1.507557, 1.88108, FALSE, TRUE, naiveBayes.default(x = X, y = Y, laplace = laplace)
+## 26    11, 14, 0.1818182, 0.1428571, 0.2727273, 0.07142857, 0.09090909, 0.2857143, 0.09090909, 0.2857143, 0, 0.2142857, 0.3636364, 0, 3.363636, 4, 1.361817, 1.88108, FALSE, TRUE, naiveBayes.default(x = X, y = Y, laplace = laplace)
+##    predicted actual
+## 21         1      1
+## 22         0      0
+## 23         0      0
+## 24         0      0
+## 25         0      0
+## 26         0      0</code></pre>
+<div class="sourceCode"><pre class="sourceCode r"><code class="sourceCode r"><span class="kw">table</span>(<span class="kw">as.numeric</span>(cv_df<span class="op">$</span>actual)<span class="op">==</span><span class="kw">as.numeric</span>(cv_df<span class="op">$</span>predicted))</code></pre></div>
+<pre><code>## 
+## FALSE  TRUE 
+##     8    18</code></pre>
+<div class="sourceCode"><pre class="sourceCode r"><code class="sourceCode r">loocv_tbl&lt;-<span class="kw">table</span>(<span class="kw">as.numeric</span>(cv_df<span class="op">$</span>actual),<span class="kw">as.numeric</span>(cv_df<span class="op">$</span>predicted))
+<span class="kw">sum</span>(<span class="kw">diag</span>(loocv_tbl))<span class="op">/</span><span class="kw">sum</span>(loocv_tbl)</code></pre></div>
+<pre><code>## [1] 0.6923077</code></pre>
+<div class="sourceCode"><pre class="sourceCode r"><code class="sourceCode r">(loocv_caret_cfm&lt;-caret<span class="op">::</span><span class="kw">confusionMatrix</span>(loocv_tbl))</code></pre></div>
+<pre><code>## Confusion Matrix and Statistics
+## 
+##    
+##      0  1
+##   0  7  5
+##   1  3 11
+##                                           
+##                Accuracy : 0.6923          
+##                  95% CI : (0.4821, 0.8567)
+##     No Information Rate : 0.6154          
+##     P-Value [Acc &gt; NIR] : 0.2765          
+##                                           
+##                   Kappa : 0.3735          
+##                                           
+##  Mcnemar's Test P-Value : 0.7237          
+##                                           
+##             Sensitivity : 0.7000          
+##             Specificity : 0.6875          
+##          Pos Pred Value : 0.5833          
+##          Neg Pred Value : 0.7857          
+##              Prevalence : 0.3846          
+##          Detection Rate : 0.2692          
+##    Detection Prevalence : 0.4615          
+##       Balanced Accuracy : 0.6937          
+##                                           
+##        'Positive' Class : 0               
+## </code></pre>
+<div class="sourceCode"><pre class="sourceCode r"><code class="sourceCode r"><span class="co"># now we have to apply the training models to testdata and average them </span>
+<span class="co"># since this is classification we will take the majority vote</span>
+<span class="co"># double loop</span>
+
+tstcv.perf&lt;-<span class="kw">as.data.frame</span>(<span class="kw">do.call</span>(<span class="st">'cbind'</span>,<span class="kw">lapply</span>(cv_df<span class="op">$</span>m,<span class="dt">FUN=</span><span class="cf">function</span>(m,<span class="dt">data=</span>df_test)
+{
+   
+  v&lt;-<span class="kw">predict</span>(m,data,<span class="dt">type=</span><span class="st">'raw'</span>)
+  lbllist&lt;-<span class="kw">unlist</span>(<span class="kw">apply</span>(<span class="kw">round</span>(v),<span class="dv">1</span>,which.max))<span class="op">-</span><span class="dv">1</span>
+ 
+}
+  )))
+np&lt;-<span class="kw">ncol</span>(tstcv.perf)
+predclass&lt;-<span class="kw">unlist</span>(<span class="kw">apply</span>(tstcv.perf,<span class="dv">1</span>,<span class="dt">FUN=</span><span class="cf">function</span>(v){ <span class="kw">ifelse</span>(<span class="kw">sum</span>(v[<span class="dv">2</span><span class="op">:</span><span class="kw">length</span>(v)])<span class="op">/</span>np<span class="op">&lt;</span><span class="fl">0.5</span>,<span class="dv">0</span>,<span class="dv">1</span>)}))
+loocvtbl&lt;-<span class="kw">table</span>(df_test<span class="op">$</span>label,predclass)
+(loocv_cfm&lt;-caret<span class="op">::</span><span class="kw">confusionMatrix</span>(loocvtbl))</code></pre></div>
+<pre><code>## Confusion Matrix and Statistics
+## 
+##    predclass
+##     0 1
+##   0 2 0
+##   1 2 6
+##                                           
+##                Accuracy : 0.8             
+##                  95% CI : (0.4439, 0.9748)
+##     No Information Rate : 0.6             
+##     P-Value [Acc &gt; NIR] : 0.1673          
+##                                           
+##                   Kappa : 0.5455          
+##                                           
+##  Mcnemar's Test P-Value : 0.4795          
+##                                           
+##             Sensitivity : 0.50            
+##             Specificity : 1.00            
+##          Pos Pred Value : 1.00            
+##          Neg Pred Value : 0.75            
+##              Prevalence : 0.40            
+##          Detection Rate : 0.20            
+##    Detection Prevalence : 0.20            
+##       Balanced Accuracy : 0.75            
+##                                           
+##        'Positive' Class : 0               
+## </code></pre>
+<div class="sourceCode"><pre class="sourceCode r"><code class="sourceCode r"><span class="kw">print</span>(<span class="kw">paste</span>(<span class="st">'Bagging:'</span>,bagging.perf.mean[<span class="dv">1</span>]))</code></pre></div>
+<pre><code>## [1] &quot;Bagging: 0.562&quot;</code></pre>
+<div class="sourceCode"><pre class="sourceCode r"><code class="sourceCode r"><span class="kw">print</span>(<span class="kw">paste</span>(<span class="st">'LOO-CV:'</span>,loocv_cfm<span class="op">$</span>overall[<span class="dv">1</span>]))</code></pre></div>
+<pre><code>## [1] &quot;LOO-CV: 0.8&quot;</code></pre>
+<div class="sourceCode"><pre class="sourceCode r"><code class="sourceCode r"><span class="kw">print</span>(<span class="kw">paste</span>(<span class="st">'Base NB'</span>,nb.cfm<span class="op">$</span>overall[[<span class="dv">1</span>]]))</code></pre></div>
+<pre><code>## [1] &quot;Base NB 0.8&quot;</code></pre>
 </div>
 </div>
 
