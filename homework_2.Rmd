@@ -22,6 +22,7 @@ library(MASS)
 library(mltools)
 library(knitr)
 ```
+
 ## A)
 
 Run Bagging (ipred package)   
@@ -43,7 +44,7 @@ df$y <- as.numeric(df$y)
 df$X <- as.factor(df$X)
 ```
 
-### Split Data into Train(70%) and Test data(30%)  
+### Split Data into Train (70%) and Test data(30%)  
 
 ```{r}
 set.seed(42)
@@ -52,23 +53,48 @@ df_train <- df[split_df,]
 df_test <- df[-split_df,]
 ```
 
+### Model Performance Estimator
 ```{r}
-nb.model<-naiveBayes(df_train$label~.,data=df_train)
-#str(nb.model)
-object.size(nb.model)
-nb.tstpred<-predict(nb.model,df_test,type='raw')
-nb.tstclass<-unlist(apply(round(nb.tstpred),1,which.max))-1
-nb.tbl<-table(df_test$label, nb.tstclass)
-nb.cfm<-caret::confusionMatrix(nb.tbl)
-nb.cfm
-start_tm <- proc.time() 
-df<-df_train
-runModel<-function(df) {naiveBayes(df$label~.,data=df[sample(1:nrow(df),nrow(df),replace=T),])}
-lapplyrunmodel<-function(x)runModel(df)
-system.time(models<-lapply(1:100,lapplyrunmodel))
-object.size(models)
-end_tm<-proc.time() 
-print(paste("time taken to run 100 bootstrapps",(end_tm-start_tm),sep=":"))
+estimate_model_performance <- function(y_true, y_pred, model_name){
+  cm <- confusionMatrix(table(y_true, y_pred))
+  cm_table <- cm$table
+  tpr <- cm_table[[1]] / (cm_table[[1]] + cm_table[[4]])
+  fnr <- 1 - tpr
+  fpr <- cm_table[[3]] / (cm_table[[3]] + cm_table[[4]])
+  tnr <- 1 - fpr
+  accuracy <- cm$overall[[1]]
+  for_auc <- prediction(c(y_pred), y_true)
+  auc <- performance(for_auc, "auc")
+  auc <- auc@y.values[[1]]
+  return(data.frame(Algo = model_name, AUC = auc, ACCURACY = accuracy, TPR = tpr, FPR = fpr, TNR = tnr, FNR = fnr))
+}
+```
+
+
+### NB Model Building
+
+```{r}
+nb_model<-naiveBayes(df_train$label~.,data=df_train)
+nb_testpred<-predict(nb_model,df_test,type='raw')
+nb_testclass<-unlist(apply(round(nb_testpred),1,which.max))-1
+nb_table<-table(df_test$label, nb_testclass)
+nb_cm<-caret::confusionMatrix(nb_table)
+```
+
+### Estimate NB model test data () performance
+
+```{r}
+estimate_model_performance(df_test$label,nb_testclass,'NB')
+```
+
+
+### Bagging MEthodology - NB Model
+
+```{r}
+# iterate the model 200 times
+runModel<-function(df_train) {naiveBayes(df_train$label~.,data=df_train[sample(1:nrow(df_train),nrow(df_train),replace=T),])}
+lapplyrunmodel<-function(x)runModel(df_train)
+models<-lapply(1:200,lapplyrunmodel)
 bagging_preds<-lapply(models,FUN=function(M,D=df_test)predict(M,D,type='raw'))
 bagging_cfm<-lapply(bagging_preds,FUN=function(P,A=df_test$label)
 {pred_class<-unlist(apply(round(P),1,which.max))-1
@@ -79,82 +105,48 @@ bagging_cfm<-lapply(bagging_preds,FUN=function(P,A=df_test$label)
 bagging.perf<-as.data.frame(do.call('rbind',lapply(bagging_cfm,FUN=function(cfm)c(cfm$overall,cfm$byClass))))
 bagging.perf.mean<-mean(bagging.perf$Accuracy)
 bagging.perf.var<-sd(bagging.perf$Accuracy)
-  
+```
+
+### Variance of Bagging Methodology - 200 times NB model run 
+```{r  echo=FALSE}
 bagging.perf.var
+```
+
+### Mean of Bagging Methodology - 200 times NB model run 
+```{r  echo=FALSE}
 bagging.perf.mean
-(bagging_tm<-proc.time()-start_tm)
 ```
 
-## B)
+### Logistic Regression
 
-Run LOOCV (jacknife) for the same dataset
-
-* iterate over all points
-
-* keep one observation as test
-
-* train using the rest of the observations
-
-* determine test metrics
-
-* aggregate the test metrics
-
-end of loop
-
-find the average of the test metric(s)
-
-Compare (A), (B) above with the results you obtained in HW-1  and write 3 sentences explaining the
-
-observed difference.
-
-### Jacknife: Leave One Out (LOO) Cross Validation
-
-
-```{r running_jacknife_loocv}
-df_train_num<-nrow(df_train)
-
-cv_df<-do.call('rbind',lapply(1:df_train_num,FUN=function(idx,data=df_train) { # For each observation
-  m<-naiveBayes(data$label[-idx]~.,data=data[-idx,]) # train with ALL other observations
-  p<-predict(m,data[idx,-df_train_num],type='raw') # predict that one observation
-   # NB returns the probabilities of the classes, as per Bayesian Classifier,we take the classs with the higher probability
-   pc<-unlist(apply(round(p),1,which.max))-1 # -1 to make class to be 0 or 1, which.max returns 1 or 2
-  list(fold=idx,m=m,predicted=pc,actual=data$label[idx]) # store the idx, model, predicted class and actual class
-  }
-))
-
+```{r}
+logit_model <- glm(df_train$label ~ ., data = df_train, family = "binomial")
+logit_prob <- predict(logit_model, df_test, type = "response")
+logit_y_pred <- as.factor(ifelse(logit_prob <= 0.5, 0, 1))
 ```
 
+### Estimate Logistic model test data () performance
 
-```{r averaging_the_cv}
-
-cv_df<-as.data.frame(cv_df)
-head(cv_df)
-tail(cv_df)
-table(as.numeric(cv_df$actual)==as.numeric(cv_df$predicted))
-
-loocv_tbl<-table(as.numeric(cv_df$actual),as.numeric(cv_df$predicted))
-sum(diag(loocv_tbl))/sum(loocv_tbl)
-(loocv_caret_cfm<-caret::confusionMatrix(loocv_tbl))
-# now we have to apply the training models to testdata and average them 
-# since this is classification we will take the majority vote
-# double loop
-
-tstcv.perf<-as.data.frame(do.call('cbind',lapply(cv_df$m,FUN=function(m,data=df_test)
-{
-   
-  v<-predict(m,data,type='raw')
-  lbllist<-unlist(apply(round(v),1,which.max))-1
- 
-}
-  )))
-np<-ncol(tstcv.perf)
-predclass<-unlist(apply(tstcv.perf,1,FUN=function(v){ ifelse(sum(v[2:length(v)])/np<0.5,0,1)}))
-loocvtbl<-table(df_test$label,predclass)
-(loocv_cfm<-caret::confusionMatrix(loocvtbl))
-
+```{r}
+estimate_model_performance(df_test$label,logit_y_pred,'Logistic')
 ```
-```{r comparing-metrics}
-print(paste('Bagging:',bagging.perf.mean[1]))
-print(paste('LOO-CV:',loocv_cfm$overall[1]))
-print(paste('Base NB',nb.cfm$overall[[1]]))
+
+### Bagging MEthodology - Logistic Model
+
+```{r}
+# iterate the model 200 times
+runModel<-function(df_train) {glm(df_train$label~.,data=df_train[sample(1:nrow(df_train),nrow(df_train),replace=T),],family = "binomial")}
+lapplyrunmodel<-function(x)runModel(df_train)
+models<-lapply(1:200,lapplyrunmodel)
+bagging_preds<-lapply(models,FUN=function(M,D=df_test)predict(M,D,type='response'))
+bagging_cfm<-lapply(bagging_preds,FUN=function(P,A=df_test$label)
+{pred_class<-unlist(apply(round(P),1,which.max))-1
+  pred_tbl<-table(A,pred_class)
+  pred_cfm<-caret::confusionMatrix(pred_tbl)
+  pred_cfm
+})
+bagging.perf<-as.data.frame(do.call('rbind',lapply(bagging_cfm,FUN=function(cfm)c(cfm$overall,cfm$byClass))))
+bagging.perf.mean<-mean(bagging.perf$Accuracy)
+bagging.perf.var<-sd(bagging.perf$Accuracy)
 ```
+
