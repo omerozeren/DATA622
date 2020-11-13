@@ -1,5 +1,5 @@
 ---
-title: "DATA 622 - Homework 2"
+title: "DATA 622 - Test 1"
 author: "OMER OZEREN"
 output:
   html_document:
@@ -15,13 +15,15 @@ library(class)
 library(pROC)
 library(ROCR)
 library(caret)
-library(C50)
 library(e1071)
 library(naivebayes)
 library(MASS)
 library(mltools)
 library(knitr)
+library(dplyr)
+library(tidyr)
 ```
+
 ## A)
 
 Run Bagging (ipred package)   
@@ -37,13 +39,13 @@ Run Bagging (ipred package)
 ### Load the Data
 
 ```{r}
-df <- read.table("C:/Users/OMERO/Documents/GitHub/DATA622/data.txt",header = T,sep=',')
+df <- read.table("~/Documents/GitHub/DATA622/data.txt",header = T,sep=',')
 df$label <- ifelse(df$label =="BLACK",1,0)
 df$y <- as.numeric(df$y)
 df$X <- as.factor(df$X)
 ```
 
-### Split Data into Train(70%) and Test data(30%)  
+### Split Data into Train (70%) and Test data(30%)  
 
 ```{r}
 set.seed(42)
@@ -52,109 +54,135 @@ df_train <- df[split_df,]
 df_test <- df[-split_df,]
 ```
 
+### Model Performance Estimator
 ```{r}
-nb.model<-naiveBayes(df_train$label~.,data=df_train)
-#str(nb.model)
-object.size(nb.model)
-nb.tstpred<-predict(nb.model,df_test,type='raw')
-nb.tstclass<-unlist(apply(round(nb.tstpred),1,which.max))-1
-nb.tbl<-table(df_test$label, nb.tstclass)
-nb.cfm<-caret::confusionMatrix(nb.tbl)
-nb.cfm
-start_tm <- proc.time() 
-df<-df_train
-runModel<-function(df) {naiveBayes(df$label~.,data=df[sample(1:nrow(df),nrow(df),replace=T),])}
-lapplyrunmodel<-function(x)runModel(df)
-system.time(models<-lapply(1:100,lapplyrunmodel))
-object.size(models)
-end_tm<-proc.time() 
-print(paste("time taken to run 100 bootstrapps",(end_tm-start_tm),sep=":"))
-bagging_preds<-lapply(models,FUN=function(M,D=df_test)predict(M,D,type='raw'))
-bagging_cfm<-lapply(bagging_preds,FUN=function(P,A=df_test$label)
-{pred_class<-unlist(apply(round(P),1,which.max))-1
-  pred_tbl<-table(A,pred_class)
-  pred_cfm<-caret::confusionMatrix(pred_tbl)
-  pred_cfm
-})
-bagging.perf<-as.data.frame(do.call('rbind',lapply(bagging_cfm,FUN=function(cfm)c(cfm$overall,cfm$byClass))))
-bagging.perf.mean<-mean(bagging.perf$Accuracy)
-bagging.perf.var<-sd(bagging.perf$Accuracy)
-  
-bagging.perf.var
-bagging.perf.mean
-(bagging_tm<-proc.time()-start_tm)
-```
-
-## B)
-
-Run LOOCV (jacknife) for the same dataset
-
-* iterate over all points
-
-* keep one observation as test
-
-* train using the rest of the observations
-
-* determine test metrics
-
-* aggregate the test metrics
-
-end of loop
-
-find the average of the test metric(s)
-
-Compare (A), (B) above with the results you obtained in HW-1  and write 3 sentences explaining the
-
-observed difference.
-
-### Jacknife: Leave One Out (LOO) Cross Validation
-
-
-```{r running_jacknife_loocv}
-df_train_num<-nrow(df_train)
-
-cv_df<-do.call('rbind',lapply(1:df_train_num,FUN=function(idx,data=df_train) { # For each observation
-  m<-naiveBayes(data$label[-idx]~.,data=data[-idx,]) # train with ALL other observations
-  p<-predict(m,data[idx,-df_train_num],type='raw') # predict that one observation
-   # NB returns the probabilities of the classes, as per Bayesian Classifier,we take the classs with the higher probability
-   pc<-unlist(apply(round(p),1,which.max))-1 # -1 to make class to be 0 or 1, which.max returns 1 or 2
-  list(fold=idx,m=m,predicted=pc,actual=data$label[idx]) # store the idx, model, predicted class and actual class
-  }
-))
-
-```
-
-
-```{r averaging_the_cv}
-
-cv_df<-as.data.frame(cv_df)
-head(cv_df)
-tail(cv_df)
-table(as.numeric(cv_df$actual)==as.numeric(cv_df$predicted))
-
-loocv_tbl<-table(as.numeric(cv_df$actual),as.numeric(cv_df$predicted))
-sum(diag(loocv_tbl))/sum(loocv_tbl)
-(loocv_caret_cfm<-caret::confusionMatrix(loocv_tbl))
-# now we have to apply the training models to testdata and average them 
-# since this is classification we will take the majority vote
-# double loop
-
-tstcv.perf<-as.data.frame(do.call('cbind',lapply(cv_df$m,FUN=function(m,data=df_test)
-{
-   
-  v<-predict(m,data,type='raw')
-  lbllist<-unlist(apply(round(v),1,which.max))-1
- 
+estimate_model_performance <- function(y_true, y_pred, model_name){
+  cm <- confusionMatrix(table(y_true, y_pred))
+  cm_table <- cm$table
+  tpr <- cm_table[[1]] / (cm_table[[1]] + cm_table[[4]])
+  fnr <- 1 - tpr
+  fpr <- cm_table[[3]] / (cm_table[[3]] + cm_table[[4]])
+  tnr <- 1 - fpr
+  accuracy <- cm$overall[[1]]
+  for_auc <- prediction(c(y_pred), y_true)
+  auc <- performance(for_auc, "auc")
+  auc <- auc@y.values[[1]]
+  return(data.frame(Algo = model_name, AUC = auc, ACCURACY = accuracy, TPR = tpr, FPR = fpr, TNR = tnr, FNR = fnr))
 }
-  )))
-np<-ncol(tstcv.perf)
-predclass<-unlist(apply(tstcv.perf,1,FUN=function(v){ ifelse(sum(v[2:length(v)])/np<0.5,0,1)}))
-loocvtbl<-table(df_test$label,predclass)
-(loocv_cfm<-caret::confusionMatrix(loocvtbl))
-
 ```
-```{r comparing-metrics}
-print(paste('Bagging:',bagging.perf.mean[1]))
-print(paste('LOO-CV:',loocv_cfm$overall[1]))
-print(paste('Base NB',nb.cfm$overall[[1]]))
+
+
+### NB Model Building
+
+```{r}
+nb_model<-naiveBayes(df_train$label~.,data=df_train)
+nb_testpred<-predict(nb_model,df_test,type='raw')
+nb_testclass<-unlist(apply(round(nb_testpred),1,which.max))-1
+nb_table<-table(df_test$label, nb_testclass)
+nb_cm<-caret::confusionMatrix(nb_table)
+```
+
+### Estimate NB model test data () performance
+
+```{r}
+estimate_model_performance(df_test$label,nb_testclass,'NB')
+```
+
+
+### Bagging Methodology - NB Model
+
+I'm going to create a function for boostrap purposes first.I'm going to run NB model  50 times and store the performance metrics for each data boostrap.
+
+```{r}
+apply_bootstrap_data <- function(data, proportion = 0.7, sample_with_replacement = TRUE){
+  observation <- round(nrow(data) * proportion, 0)
+  return(data[sample(nrow(data), observation, replace = sample_with_replacement),])
+}
+```
+
+```{r}
+the_bags <- list()
+for (i in 1:50){
+  sample <- apply_bootstrap_data(df_train)
+  the_bags[[i]] <- sample
+  
+  # Train the Naive Bayes Model
+  nb_model <- naiveBayes(sample$label ~ ., data = sample)
+  y_pred <- predict(nb_model, df_test,type='raw')
+  y_pred_class<-unlist(apply(round(y_pred),1,which.max))-1
+  ## Evaluate the capacity to learn
+  performance <- estimate_model_performance(df_test$label, y_pred_class, paste("NB Bag", i))
+  if(exists("performance_table")){
+    performance_table <- rbind(performance_table, performance)
+  } else {
+    performance_table <- performance
+  }
+}
+
+``` 
+### The Mean of Boostrap NM model 
+
+```{r}
+mean(performance_table$ACCURACY)
+```
+
+### The Variance of Boostrap NM model 
+
+```{r}
+var(performance_table$ACCURACY)
+```
+
+Now, I'm going to try KNN stand alone and boostrap methodology
+
+### KNN Model Building
+
+```{r}
+knn_y_true<- knn(df_train[1:2],df_test[1:2], cl = df_train$label, k = 5)
+knn_testclass<-knn_y_true
+knn_table<-table(df_test$label, knn_testclass)
+knn_cm<-caret::confusionMatrix(knn_table)
+knn_cm
+```
+
+### Bagging Methodology - KNN Model
+
+I'm going to create a function for boostrap purposes first.I'm going to run KNN model  50 times and store the performance metrics for each data boostrap.
+
+```{r}
+apply_bootstrap_data <- function(data, proportion = 0.7, sample_with_replacement = TRUE){
+  observation <- round(nrow(data) * proportion, 0)
+  return(data[sample(nrow(data), observation, replace = sample_with_replacement),])
+}
+```
+
+```{r}
+the_bags <- list()
+for (i in 1:50){
+  sample <- apply_bootstrap_data(df_train)
+  the_bags[[i]] <- sample
+  
+  # Train the Naive Bayes Model
+  nb_model <- naiveBayes(sample$label ~ ., data = sample)
+  y_pred <- knn(sample[1:2],df_test[1:2], cl = sample$label, k = 5)
+  y_pred_class<-y_pred
+  ## Evaluate the capacity to learn
+  performance <- estimate_model_performance(df_test$label, y_pred_class, paste("KNN Bag", i))
+  if(exists("performance_table_knn")){
+    performance_table_knn <- rbind(performance_table_knn, performance)
+  } else {
+    performance_table_knn <- performance
+  }
+}
+
+``` 
+### The Mean of Boostrap KNN model 
+
+```{r}
+mean(performance_table_knn$ACCURACY)
+```
+
+### The Variance of Boostrap KNN model 
+
+```{r}
+var(performance_table_knn$ACCURACY)
 ```
