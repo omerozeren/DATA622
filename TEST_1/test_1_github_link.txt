@@ -1,0 +1,9 @@
+Hi Prof. Raman Kannan,
+
+Here is my Test 1 project .rmd,R,.pdf format solutions links to Github.
+
+https://github.com/omerozeren/DATA622/tree/master/TEST_1
+
+Thank you
+
+Omer
