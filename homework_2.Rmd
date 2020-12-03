@@ -1,0 +1,51 @@
+---
+title: "DATA 622 - Homework 2"
+author: "OMER OZEREN"
+output:
+  html_document:
+    highlight: tango
+    theme: journal
+    toc: yes
+    toc_depth: 5
+    toc_float: yes
+  word_document:
+    toc: yes
+    toc_depth: '5'
+---
+
+```{r echo=FALSE, include=FALSE}
+library(class)
+library(pROC)
+library(ROCR)
+library(caret)
+library(C50)
+library(e1071)
+library(naivebayes)
+library(MASS)
+library(mltools)
+library(knitr)
+```
+
+## PART A
+
+### Introduction
+STEP#0: Pick any two classifiers of (SVM,Logistic,DecisionTree,NaiveBayes). Pick heart or ecoli dataset. Heart is simpler and ecoli compounds the problem as it is NOT a balanced dataset. From a grading perspective both carry the same weight.
+
+STEP#1 For each classifier, Set a seed (43)
+
+STEP#2 Do a 80/20 split and determine the Accuracy, AUC and as many metrics as returned by the Caret package (confusionMatrix) Call this the base_metric. Note down as best as you can development (engineering) cost as well as computing cost(elapsed time).
+Start with the original dataset and set a seed (43). Then run a cross validation of 5 and 10 of the model on the training set. Determine the same set of metrics and compare the cv_metrics with the base_metric. Note down as best as you can development (engineering) cost as well as computing cost(elapsed time).
+Start with the original dataset and set a seed (43) Then run a bootstrap of 200 resamples and compute the same set of metrics and for each of the two classifiers build a three column table for each experiment (base, bootstrap, cross-validated). Note down as best as you can development (engineering) cost as well as computing cost(elapsed time).
+
+### Import Data 
+```{r}
+data <- read.csv("https://raw.githubusercontent.com/omerozeren/DATA624/master/HMW10/GroceryDataSet.csv")
+```
+### Split Data into Train(80%) and Test data(20%)  
+
+```{r}
+set.seed(998)
+split_df <- createDataPartition(df$label, p = .80, list = FALSE)
+df_train <- df[split_df,]
+df_test <- df[-split_df,]
+```
